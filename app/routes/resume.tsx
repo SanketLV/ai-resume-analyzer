@@ -3,7 +3,7 @@ import {Link, useNavigate, useParams} from "react-router";
 import {usePuterStore} from "~/lib/puter";
 import Summary from "~/components/Summary";
 import Details from "~/components/Details";
-import Ats from "~/components/ATS";
+import ATS from "~/components/ATS";
 
 export const meta= () => ([
     {title: 'Resumind | Review'},
@@ -24,30 +24,45 @@ const Resume = () => {
 
     useEffect(() => {
         const loadResume = async () => {
-            const resume = await kv.get(`/resume/${id}`)
+            if (isLoading || !id || !kv || !fs) return;
+            
+            try {
+                const resume = await kv.get(`resume:${id}`)
+                if(!resume) return
 
-            if(!resume) return;
+                const data = JSON.parse(resume)
 
-            const data = JSON.parse(resume)
+                const resumeBlob = await fs.read(data.resumePath)
+                if(!resumeBlob) {
+                    return;
+                }
 
-            const resumeBlob = await fs.read(data.resumePath)
-            if(!resumeBlob) return;
+                const pdfBlob = new Blob([resumeBlob], { type: 'application/pdf' })
+                const resumeUrl = URL.createObjectURL(pdfBlob)
+                setResumeUrl(resumeUrl)
 
-            const pdfBlob = new Blob([resumeBlob], { type: 'application/pdf' })
-            const resumeUrl = URL.createObjectURL(pdfBlob)
-            setResumeUrl(resumeUrl)
+                const imageBlob = await fs.read(data.imagePath)
+                if(!imageBlob) {
+                    return;
+                }
+                const imageUrl = URL.createObjectURL(imageBlob)
+                setImageUrl(imageUrl)
 
-            const imageBlob = await fs.read(data.imagePath)
-            if(!imageBlob) return;
-            const imageUrl = URL.createObjectURL(imageBlob)
-            setImageUrl(imageUrl)
-
-            setFeedback(data.feedback)
-            console.log({resumeUrl, imageUrl, feedback: data.feedback})
-
+                setFeedback(data.feedback)
+            } catch (error) {
+                console.error('Error loading resume:', error);
+            }
         }
-        loadResume()
-    }, [id]);
+        
+        // Using an IIFE to properly handle the promise
+        (async () => {
+            try {
+                await loadResume();
+            } catch (error) {
+                console.error("Error in loadResume:", error);
+            }
+        })();
+    }, [id, isLoading, kv, fs]);
 
     return (
         <main className="!pt-0">
@@ -72,7 +87,7 @@ const Resume = () => {
                     {feedback ? (
                         <div className="flex flex-col gap-8 animate-in fade-in duration-1000">
                             <Summary feedback={feedback} />
-                            <Ats score={feedback.ATS.score || 0} suggtestions={feedback.ATS.tips || []} />
+                            <ATS score={feedback.ATS.score || 0} suggestions={feedback.ATS.tips || []} />
                             <Details feedback={feedback} />
 
                         </div>
