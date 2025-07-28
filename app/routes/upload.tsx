@@ -56,8 +56,17 @@ const Upload = () => {
 
         if(!feedback) return setStatusText("Error: Failed to analyze resume")
 
-        const feedbackText = typeof feedback.message.content === "string" ? feedback.message.content : feedback.message.content[0].text
-        data.feedback = JSON.parse(feedbackText)
+        const feedbackText = typeof feedback.message.content === "string"
+            ? feedback.message.content
+            : feedback.message.content[0].text
+        try {
+            data.feedback = JSON.parse(feedbackText)
+        } catch (parseError) {
+            console.error('Failed to parse AI feedback:', parseError)
+            setStatusText("Error: Invalid AI response format")
+            setIsProcessing(false)
+            return
+        }
         await kv.set(`resume:${uuid}`, JSON.stringify(data))
         setStatusText("Analysis complete, redirecting...")
         console.log(data)
